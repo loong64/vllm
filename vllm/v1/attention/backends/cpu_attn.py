@@ -461,6 +461,36 @@ def _riscv_supports_rvv() -> bool:
     return any(f"zvl{n}b" in cpuinfo for n in (128, 256))
 
 
+@functools.lru_cache(maxsize=1)
+def _loongarch_supports_lasx() -> bool:
+    try:
+        return torch.ops._C.cpu_attn_has_isa("lasx")
+    except Exception:
+        pass
+
+    try:
+        with open("/proc/cpuinfo") as f:
+            cpuinfo = f.read()
+    except OSError:
+        return False
+    return "lasx" in cpuinfo
+
+
+@functools.lru_cache(maxsize=1)
+def _loongarch_supports_lsx() -> bool:
+    try:
+        return torch.ops._C.cpu_attn_has_isa("lsx")
+    except Exception:
+        pass
+
+    try:
+        with open("/proc/cpuinfo") as f:
+            cpuinfo = f.read()
+    except OSError:
+        return False
+    return "lsx" in cpuinfo
+
+
 def _get_attn_isa(
     dtype: torch.dtype,
     block_size: int,
@@ -479,6 +509,7 @@ def _get_attn_isa(
     supports_arm = arch == CpuArchEnum.ARM
     supports_vxe = arch == CpuArchEnum.S390X
     supports_riscv = arch == CpuArchEnum.RISCV
+    supports_loongarch = arch == CpuArchEnum.LOONGARCH
     supports_vsx = arch == CpuArchEnum.POWERPC
     supports_avx512 = torch.cpu._is_avx512_supported()
     if fp8_kv and not supports_amx and not supports_avx512:
@@ -493,6 +524,10 @@ def _get_attn_isa(
             return "neon"
         elif supports_riscv and _riscv_supports_rvv():
             return "rvv"
+        elif supports_loongarch and _loongarch_supports_lasx():
+            return "lasx"
+        elif supports_loongarch and _loongarch_supports_lsx():
+            return "lsx"
         elif supports_vxe:
             return "vxe"
         elif supports_vsx:
