@@ -63,6 +63,35 @@ def get_attn_isa(
     )
 
 
+@pytest.mark.parametrize(
+    ("lasx_supported", "lsx_supported", "expected_isa"),
+    [(True, True, "lasx"), (False, True, "lsx"), (False, False, "vec")],
+)
+def test_get_attn_isa_loongarch(
+    monkeypatch: pytest.MonkeyPatch,
+    lasx_supported: bool,
+    lsx_supported: bool,
+    expected_isa: str,
+) -> None:
+    monkeypatch.setattr(
+        current_platform,
+        "get_cpu_architecture",
+        lambda: CpuArchEnum.LOONGARCH,
+    )
+    monkeypatch.setattr(torch.cpu, "_is_amx_tile_supported", lambda: False)
+    monkeypatch.setattr(torch.cpu, "_is_avx512_supported", lambda: False)
+    monkeypatch.setattr(
+        "vllm.v1.attention.backends.cpu_attn._loongarch_supports_lasx",
+        lambda: lasx_supported,
+    )
+    monkeypatch.setattr(
+        "vllm.v1.attention.backends.cpu_attn._loongarch_supports_lsx",
+        lambda: lsx_supported,
+    )
+
+    assert _get_attn_isa(torch.bfloat16, 32) == expected_isa
+
+
 # rand number generation takes too much time, cache rand tensors
 @functools.lru_cache(maxsize=128, typed=False)
 def tensor_cache(elem_num: int, dtype: torch.dtype, tag: str = "none") -> torch.Tensor:
@@ -926,6 +955,52 @@ def test_varlen_with_paged_kv_normal_neon(
     use_sink: bool,
     isa: str,
 ) -> None:
+    varlen_with_paged_kv(
+        seq_lens=seq_lens,
+        num_heads=num_heads,
+        head_size=head_size,
+        sliding_window=sliding_window,
+        dtype=dtype,
+        block_size=block_size,
+        soft_cap=soft_cap,
+        num_blocks=num_blocks,
+        use_alibi=use_alibi,
+        use_sink=use_sink,
+        isa=isa,
+    )
+
+
+@pytest.mark.parametrize("seq_lens", SEQ_LENS)
+@pytest.mark.parametrize("num_heads", NUM_HEADS)
+@pytest.mark.parametrize("head_size", HEAD_SIZES)
+@pytest.mark.parametrize("block_size", [96, 128])
+@pytest.mark.parametrize("sliding_window", SLIDING_WINDOWS)
+@pytest.mark.parametrize("dtype", QTYPES)
+@pytest.mark.parametrize("soft_cap", [None])
+@pytest.mark.parametrize("num_blocks", NUM_BLOCKS)
+@pytest.mark.parametrize("use_alibi", [False])
+@pytest.mark.parametrize("use_sink", [False])
+@pytest.mark.parametrize("isa", ["lsx", "lasx"])
+@pytest.mark.skipif(
+    current_platform.get_cpu_architecture() != CpuArchEnum.LOONGARCH,
+    reason="Not a LoongArch CPU.",
+)
+def test_varlen_with_paged_kv_normal_loongarch(
+    seq_lens: list[tuple[int, int]],
+    num_heads: tuple[int, int],
+    head_size: int,
+    sliding_window: int | None,
+    dtype: torch.dtype,
+    block_size: int,
+    soft_cap: float | None,
+    num_blocks: int,
+    use_alibi: bool,
+    use_sink: bool,
+    isa: str,
+) -> None:
+    if not torch.ops._C.cpu_attn_has_isa(isa):
+        pytest.skip(f"{isa.upper()} is not enabled in this build.")
+
     varlen_with_paged_kv(
         seq_lens=seq_lens,
         num_heads=num_heads,
