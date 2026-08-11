@@ -23,6 +23,8 @@ ISA_TYPES = {
     "RVV": 5,
     "VSX": 6,
     "AMX_FP8": 7,
+    "LSX": 8,
+    "LASX": 9,
 }
 
 # KV cache index: 0 = auto (same as scalar_t), 1 = fp8_e4m3, 2 = fp8_e5m2
@@ -40,7 +42,7 @@ KV_CACHE_CPP_TYPES = {
 }
 
 # ISAs supported for head_dims divisible by 32
-ISA_FOR_32 = ["AMX", "AMX_FP8", "NEON", "VEC", "VEC16", "VXE", "RVV", "VSX"]
+ISA_FOR_32 = ["AMX", "AMX_FP8", "NEON", "VEC", "VEC16", "VXE", "RVV", "VSX", "LSX", "LASX"]
 
 # ISAs supported for head_dims divisible by 16 only
 ISA_FOR_16 = ["VEC16"]
@@ -177,6 +179,12 @@ def generate_header_file() -> str:
   #include "cpu_attn_vsx.hpp"
 #endif
 
+#if defined(__loongarch_asx)
+  #include "cpu_attn_lasx.hpp"
+#elif defined(__loongarch_sx)
+  #include "cpu_attn_lsx.hpp"
+#endif
+
 """
 
     header += generate_helper_function()
@@ -261,6 +269,16 @@ def generate_header_file() -> str:
         fp8=False,
     )
     header += _macro_block(
+        "#elif defined(__loongarch_asx)",
+        ["LASX", "VEC", "VEC16"],
+        fp8=False,
+    )
+    header += _macro_block(
+        "#elif defined(__loongarch_sx)",
+        ["LSX", "VEC", "VEC16"],
+        fp8=False,
+    )
+    header += _macro_block(
         "#elif defined(__AVX512F__)",
         ["VEC", "VEC16"],
         fp8=True,
@@ -277,7 +295,7 @@ def generate_header_file() -> str:
     )
     header += (
         "#endif  /* CPU_CAPABILITY_AMXBF16 / __aarch64__ / __s390x__ /"
-        " __riscv / __powerpc__ */\n\n"
+        " __riscv / __powerpc__ / __loongarch */\n\n"
         "#endif  // CPU_ATTN_DISPATCH_GENERATED_H\n"
     )
 

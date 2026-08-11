@@ -24,6 +24,20 @@ static inline cpu_attention::Fp8KVCacheDataType parse_fp8_kv_dtype(
 }
 
 bool cpu_attn_has_isa(const std::string& isa) {
+  if (isa == "lsx") {
+#if defined(__loongarch_sx) && !defined(__loongarch_asx)
+    return true;
+#else
+    return false;
+#endif
+  }
+  if (isa == "lasx") {
+#if defined(__loongarch_asx)
+    return true;
+#else
+    return false;
+#endif
+  }
   if (isa == "rvv") {
 #if defined(__riscv) && defined(__riscv_v_min_vlen) && \
     (__riscv_v_min_vlen == 128 || __riscv_v_min_vlen == 256)
@@ -71,6 +85,10 @@ torch::Tensor get_scheduler_metadata(
     isa = cpu_attention::ISA::RVV;
   } else if (isa_hint == "vsx") {
     isa = cpu_attention::ISA::VSX;
+  } else if (isa_hint == "lsx") {
+    isa = cpu_attention::ISA::LSX;
+  } else if (isa_hint == "lasx") {
+    isa = cpu_attention::ISA::LASX;
   } else {
     TORCH_CHECK(false, "Unsupported CPU attention ISA hint: " + isa_hint);
   }
@@ -168,6 +186,10 @@ void cpu_attn_reshape_and_cache(
       return cpu_attention::ISA::RVV;
     } else if (isa == "vsx") {
       return cpu_attention::ISA::VSX;
+    } else if (isa == "lsx") {
+      return cpu_attention::ISA::LSX;
+    } else if (isa == "lasx") {
+      return cpu_attention::ISA::LASX;
     } else {
       TORCH_CHECK(false, "Invalid ISA type: " + isa);
     }
