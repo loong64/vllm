@@ -16,6 +16,15 @@
 #elif defined(__riscv_v)
   // riscv implementation
   #include "cpu_types_riscv.hpp"
+#elif defined(__loongarch_asx)
+  // LoongArch LASX implementation
+  #include "cpu_types_lasx.hpp"
+#elif defined(__loongarch_sx)
+  // LoongArch LSX implementation
+  #include "cpu_types_lsx.hpp"
+#elif defined(__loongarch__)
+  // LoongArch scalar implementation
+  #include "cpu_types_scalar.hpp"
 #else
   #warning "unsupported vLLM cpu implementation, vLLM will compile with scalar"
   #include "cpu_types_scalar.hpp"
