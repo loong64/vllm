@@ -82,6 +82,7 @@ class CpuArchEnum(enum.Enum):
     POWERPC = enum.auto()
     S390X = enum.auto()
     RISCV = enum.auto()
+    LOONGARCH = enum.auto()
     OTHER = enum.auto()
     UNKNOWN = enum.auto()
 
@@ -986,6 +987,8 @@ class Platform:
             return CpuArchEnum.S390X
         elif machine.startswith("riscv"):
             return CpuArchEnum.RISCV
+        elif machine.startswith("loongarch"):
+            return CpuArchEnum.LOONGARCH
 
         return CpuArchEnum.OTHER if machine else CpuArchEnum.UNKNOWN
 
